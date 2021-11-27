@@ -1,0 +1,25 @@
+package lotr.common.world.genlayer;
+
+import lotr.common.world.biome.LOTRBiome;
+import net.minecraft.world.World;
+
+public class LOTRGenLayerExtractMapRivers extends LOTRGenLayer {
+    public LOTRGenLayerExtractMapRivers(long l, LOTRGenLayer layer) {
+        super(l);
+        this.lotrParent = layer;
+    }
+
+    @Override
+    public int[] getInts(World world, int i, int k, int xSize, int zSize) {
+        int[] biomes = this.lotrParent.getInts(world, i, k, xSize, zSize);
+        int[] ints = LOTRIntCache.get(world).getIntArray(xSize * zSize);
+        for(int k1 = 0; k1 < zSize; ++k1) {
+            for(int i1 = 0; i1 < xSize; ++i1) {
+                this.initChunkSeed(i + i1, k + k1);
+                int biomeID = biomes[i1 + k1 * xSize];
+                ints[i1 + k1 * xSize] = biomeID == LOTRBiome.river.biomeID ? 2 : 0;
+            }
+        }
+        return ints;
+    }
+}

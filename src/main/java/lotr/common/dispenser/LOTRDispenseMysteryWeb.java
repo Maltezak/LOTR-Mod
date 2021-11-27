@@ -1,0 +1,13 @@
+package lotr.common.dispenser;
+
+import lotr.common.entity.projectile.LOTREntityMysteryWeb;
+import net.minecraft.dispenser.*;
+import net.minecraft.entity.IProjectile;
+import net.minecraft.world.World;
+
+public class LOTRDispenseMysteryWeb extends BehaviorProjectileDispense {
+    @Override
+    protected IProjectile getProjectileEntity(World world, IPosition position) {
+        return new LOTREntityMysteryWeb(world, position.getX(), position.getY(), position.getZ());
+    }
+}

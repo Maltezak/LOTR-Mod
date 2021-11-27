@@ -1,0 +1,103 @@
+package lotr.client.render.tileentity;
+
+import java.util.HashMap;
+
+import org.lwjgl.opengl.GL11;
+
+import lotr.client.LOTRTickHandlerClient;
+import lotr.common.entity.LOTREntities;
+import lotr.common.tileentity.LOTRTileEntityMobSpawner;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiIngameMenu;
+import net.minecraft.client.multiplayer.WorldClient;
+import net.minecraft.client.renderer.entity.RenderManager;
+import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer;
+import net.minecraft.entity.*;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.MathHelper;
+import net.minecraft.world.World;
+
+public class LOTRTileEntityMobSpawnerRenderer extends TileEntitySpecialRenderer {
+    private int tempID;
+    private HashMap initialisedItemEntities = new HashMap();
+    private static double itemYaw;
+    private static double prevItemYaw;
+
+    public static void onClientTick() {
+        prevItemYaw = itemYaw = MathHelper.wrapAngleTo180_double(itemYaw);
+        itemYaw += 1.5;
+    }
+
+    @Override
+    public void func_147496_a(World world) {
+        this.loadEntities(world);
+    }
+
+    private void loadEntities(World world) {
+        this.unloadEntities();
+        if(world != null) {
+            for(LOTREntities.SpawnEggInfo info : LOTREntities.spawnEggs.values()) {
+                String entityName = LOTREntities.getStringFromID(info.spawnedID);
+                Entity entity = EntityList.createEntityByName(entityName, world);
+                if(entity instanceof EntityLiving) {
+                    ((EntityLiving) entity).onSpawnWithEgg(null);
+                }
+                this.initialisedItemEntities.put(info.spawnedID, entity);
+            }
+        }
+    }
+
+    private void unloadEntities() {
+        this.initialisedItemEntities.clear();
+    }
+
+    @Override
+    public void renderTileEntityAt(TileEntity tileentity, double d, double d1, double d2, float f) {
+        WorldClient world = Minecraft.getMinecraft().theWorld;
+        LOTRTileEntityMobSpawner mobSpawner = (LOTRTileEntityMobSpawner) tileentity;
+        if(mobSpawner != null && !mobSpawner.isActive()) {
+            return;
+        }
+        GL11.glPushMatrix();
+        GL11.glTranslatef((float) d + 0.5f, (float) d1, (float) d2 + 0.5f);
+        Entity entity = null;
+        double yaw = 0.0;
+        double prevYaw = 0.0;
+        if(mobSpawner != null) {
+            entity = mobSpawner.getMobEntity(world);
+            yaw = mobSpawner.yaw;
+            prevYaw = mobSpawner.prevYaw;
+        }
+        else {
+            entity = (Entity) this.initialisedItemEntities.get(this.tempID);
+            yaw = itemYaw;
+            prevYaw = prevItemYaw;
+        }
+        if(entity != null) {
+            float f1 = 0.4375f;
+            GL11.glTranslatef(0.0f, 0.4f, 0.0f);
+            GL11.glRotatef((float) (prevYaw + (yaw - prevYaw) * f) * 10.0f, 0.0f, 1.0f, 0.0f);
+            GL11.glRotatef(-30.0f, 1.0f, 0.0f, 0.0f);
+            GL11.glTranslatef(0.0f, -0.4f, 0.0f);
+            GL11.glScalef(f1, f1, f1);
+            entity.setLocationAndAngles(d, d1, d2, 0.0f, 0.0f);
+            RenderManager.instance.renderEntityWithPosYaw(entity, 0.0, 0.0, 0.0, 0.0f, f);
+        }
+        GL11.glPopMatrix();
+    }
+
+    public void renderInvMobSpawner(int i) {
+        if(Minecraft.getMinecraft().currentScreen instanceof GuiIngameMenu) {
+            return;
+        }
+        GL11.glPushMatrix();
+        GL11.glTranslatef(-0.5f, -0.5f, -0.5f);
+        this.tempID = i;
+        GL11.glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+        GL11.glPushAttrib(1048575);
+        this.renderTileEntityAt(null, 0.0, 0.0, 0.0, LOTRTickHandlerClient.renderTick);
+        GL11.glPopAttrib();
+        this.tempID = 0;
+        GL11.glPopMatrix();
+    }
+}

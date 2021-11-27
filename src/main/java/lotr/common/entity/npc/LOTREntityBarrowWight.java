@@ -1,0 +1,181 @@
+package lotr.common.entity.npc;
+
+import lotr.common.*;
+import lotr.common.entity.ai.*;
+import lotr.common.fac.LOTRFaction;
+import lotr.common.world.structure.LOTRChestContents;
+import net.minecraft.block.Block;
+import net.minecraft.entity.*;
+import net.minecraft.entity.ai.*;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.init.Items;
+import net.minecraft.item.ItemStack;
+import net.minecraft.potion.*;
+import net.minecraft.util.MathHelper;
+import net.minecraft.world.World;
+
+public class LOTREntityBarrowWight extends LOTREntityNPC {
+    private static Potion[] attackEffects = new Potion[] {Potion.moveSlowdown, Potion.digSlowdown, Potion.wither};
+
+    public LOTREntityBarrowWight(World world) {
+        super(world);
+        this.setSize(0.8f, 2.5f);
+        this.getNavigator().setAvoidsWater(true);
+        this.tasks.addTask(0, new EntityAISwimming(this));
+        this.tasks.addTask(1, new LOTREntityAIHiredRemainStill(this));
+        this.tasks.addTask(2, this.getWightAttackAI());
+        this.tasks.addTask(3, new LOTREntityAIFollowHiringPlayer(this));
+        this.tasks.addTask(4, new EntityAIWander(this, 1.0));
+        this.tasks.addTask(5, new EntityAIWatchClosest2(this, EntityPlayer.class, 12.0f, 0.02f));
+        this.tasks.addTask(5, new EntityAIWatchClosest2(this, LOTREntityNPC.class, 8.0f, 0.02f));
+        this.tasks.addTask(6, new EntityAIWatchClosest(this, EntityLiving.class, 12.0f, 0.02f));
+        this.tasks.addTask(7, new EntityAILookIdle(this));
+        this.addTargetTasks(true);
+        this.spawnsInDarkness = true;
+    }
+
+    public EntityAIBase getWightAttackAI() {
+        return new LOTREntityAIAttackOnCollide(this, 1.5, false);
+    }
+
+    @Override
+    public void entityInit() {
+        super.entityInit();
+        this.dataWatcher.addObject(16, -1);
+    }
+
+    public int getTargetEntityID() {
+        return this.dataWatcher.getWatchableObjectInt(16);
+    }
+
+    public void setTargetEntityID(Entity entity) {
+        this.dataWatcher.updateObject(16, entity == null ? -1 : entity.getEntityId());
+    }
+
+    @Override
+    protected void applyEntityAttributes() {
+        super.applyEntityAttributes();
+        this.getEntityAttribute(SharedMonsterAttributes.maxHealth).setBaseValue(50.0);
+        this.getEntityAttribute(SharedMonsterAttributes.followRange).setBaseValue(40.0);
+        this.getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(0.2);
+        this.getEntityAttribute(npcAttackDamage).setBaseValue(6.0);
+    }
+
+    @Override
+    public LOTRFaction getFaction() {
+        return LOTRFaction.HOSTILE;
+    }
+
+    @Override
+    public void onLivingUpdate() {
+        super.onLivingUpdate();
+        if(this.worldObj.isRemote) {
+            for(int l = 0; l < 1; ++l) {
+                double d = this.posX + this.width * MathHelper.getRandomDoubleInRange(this.rand, -0.5, 0.5);
+                double d1 = this.posY + this.height * MathHelper.getRandomDoubleInRange(this.rand, 0.4, 0.8);
+                double d2 = this.posZ + this.width * MathHelper.getRandomDoubleInRange(this.rand, -0.5, 0.5);
+                double d3 = MathHelper.getRandomDoubleInRange(this.rand, -0.1, 0.1);
+                double d4 = MathHelper.getRandomDoubleInRange(this.rand, -0.2, -0.05);
+                double d5 = MathHelper.getRandomDoubleInRange(this.rand, -0.1, 0.1);
+                if(this.rand.nextBoolean()) {
+                    LOTRMod.proxy.spawnParticle("morgulPortal", d, d1, d2, d3, d4, d5);
+                    continue;
+                }
+                this.worldObj.spawnParticle("smoke", d, d1, d2, d3, d4, d5);
+            }
+        }
+    }
+
+    @Override
+    public void setAttackTarget(EntityLivingBase target, boolean speak) {
+        super.setAttackTarget(target, speak);
+        if(!this.worldObj.isRemote) {
+            this.setTargetEntityID(target);
+        }
+    }
+
+    @Override
+    public boolean attackEntityAsMob(Entity entity) {
+        if(super.attackEntityAsMob(entity)) {
+            int difficulty;
+            int duration;
+            if(entity instanceof EntityLivingBase && (duration = (difficulty = this.worldObj.difficultySetting.getDifficultyId()) * (difficulty + 5) / 2) > 0) {
+                for(Potion effect : attackEffects) {
+                    ((EntityLivingBase) entity).addPotionEffect(new PotionEffect(effect.id, duration * 20, 0));
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    protected LOTRAchievement getKillAchievement() {
+        return LOTRAchievement.killBarrowWight;
+    }
+
+    @Override
+    public float getAlignmentBonus() {
+        return 0.0f;
+    }
+
+    @Override
+    protected int getExperiencePoints(EntityPlayer entityplayer) {
+        return 4 + this.rand.nextInt(5);
+    }
+
+    @Override
+    public EnumCreatureAttribute getCreatureAttribute() {
+        return EnumCreatureAttribute.UNDEAD;
+    }
+
+    @Override
+    protected void dropFewItems(boolean flag, int i) {
+        super.dropFewItems(flag, i);
+        int bones = 1 + this.rand.nextInt(3) + this.rand.nextInt(i + 1);
+        for(int l = 0; l < bones; ++l) {
+            this.dropItem(Items.bone, 1);
+        }
+        if(this.rand.nextBoolean()) {
+            this.dropChestContents(LOTRChestContents.BARROW_DOWNS, 1, 2 + i + 1);
+        }
+    }
+
+    @Override
+    public boolean canDropRares() {
+        return true;
+    }
+
+    @Override
+    protected String getHurtSound() {
+        return "lotr:wight.hurt";
+    }
+
+    @Override
+    protected String getDeathSound() {
+        return "lotr:wight.death";
+    }
+
+    @Override
+    protected void func_145780_a(int i, int j, int k, Block block) {
+    }
+
+    @Override
+    public boolean getCanSpawnHere() {
+        if(super.getCanSpawnHere()) {
+            if(this.liftSpawnRestrictions) {
+                return true;
+            }
+            int i = MathHelper.floor_double(this.posX);
+            int j = MathHelper.floor_double(this.boundingBox.minY);
+            int k = MathHelper.floor_double(this.posZ);
+            return j > 62 && this.worldObj.getBlock(i, j - 1, k) == this.worldObj.getBiomeGenForCoords(i, k).topBlock;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean canReEquipHired(int slot, ItemStack itemstack) {
+        return false;
+    }
+}
